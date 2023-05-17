@@ -49,7 +49,7 @@ class ProcessTracer():
         self.pe = pe
         self.straceCommand = [
             'strace', '-p', str(pe.pid), '-e', "trace=file,read,write",
-            "-s", str("5000"),'-o', './processEvaluation/output.txt']
+            "-s", str("65535"),'-o', './processEvaluation/output.txt']
 
     def __startTrace(self) -> None:
         self.__straceProcess = subprocess.Popen(self.straceCommand, stdout=subprocess.PIPE)
