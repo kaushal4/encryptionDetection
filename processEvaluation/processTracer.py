@@ -53,7 +53,6 @@ class ProcessTracer():
 
     def __startTrace(self) -> None:
         self.__straceProcess = subprocess.Popen(self.straceCommand, stdout=subprocess.PIPE)
-        measeTimeUtils.MeasureTime.start()
 
     def Terminate(self) -> None:
         if self.__straceProcess is not None:
@@ -112,6 +111,7 @@ class ProcessTracer():
         return None
 
     def __parseOperation(self, straceOutput: str):
+        measeTimeUtils.MeasureTime.start()
         sysCall = self.__getOperation(straceOutput)
         if (sysCall == ProcessSyscallType.OPEN):
             self.__parseOpenOperation(straceOutput)
@@ -149,11 +149,11 @@ class ProcessTracer():
         self.__startTrace()
         if (self.__straceProcess is not None):
             with open('./processEvaluation/output.txt', 'r') as f:
-                while True:
+                while self.__straceProcess.poll() is None:
                     command = f.readline()
                     if (len(command) != 0):
                         self.__parseOperation(
                             str(command))
                     time.sleep(0.1)
-            self.__straceProcess.wait()
+            return
         raise straceStartFail()

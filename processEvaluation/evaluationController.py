@@ -13,9 +13,9 @@ class EvaluationController():
         thread = threading.Thread(target=self.__tracer.run,group=None)
         thread.start()  
         while (thread.is_alive()):
-            time.sleep(1)
-            self.__pe.evaluate()
-        self.__tracer.Terminate()
-    
+            if(self.__pe.evaluate()):
+                break
+        self.Terminate()    
+
     def Terminate(self):
         self.__tracer.Terminate()

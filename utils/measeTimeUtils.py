@@ -4,12 +4,16 @@ import datetime
 
 
 class MeasureTime():
-    start = datetime.datetime.now()
+    __startTime = datetime.datetime.now()
+    __hasStarted = False
 
     @staticmethod
     def start():
-        MeasureTime.start = datetime.datetime.now()
+        if (MeasureTime.__hasStarted):
+            return
+        MeasureTime.__startTime = datetime.datetime.now()
+        MeasureTime.__hasStarted = True
 
     @staticmethod
     def getTime() -> float:
-        return (datetime.datetime.now() - MeasureTime.start).total_seconds()
+        return (datetime.datetime.now() - MeasureTime.__startTime).total_seconds()
