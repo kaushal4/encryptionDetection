@@ -49,9 +49,6 @@ def listFiles(startpath) -> List[str]:
 
 
 def getRandomFileName(extension: str) -> str:
-    """
-    Returns a random file name with the specified extension.
-    """
     letters = string.ascii_lowercase
     # generates a random 10-character string
     file_name = ''.join(random.choice(letters) for i in range(10))
@@ -113,5 +110,6 @@ def runRandomReadWrite(seconds: int, readDir: str, writeDir: str):
 
 
 print(os.getpid())
+sleep(10)
 runRandomReadWrite(5, "/home/kaushal/Documents/abroad/encrypting/testDir/readDir",
                    "/home/kaushal/Documents/abroad/encrypting/testDir/writeDir")
