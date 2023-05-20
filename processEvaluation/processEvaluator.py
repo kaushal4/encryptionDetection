@@ -1,11 +1,10 @@
-import time
-
+import threading
 from utils import measeTimeUtils
 from .popo import ProcessOperation, OperationType
 from detectionAlorithms import isEncrypted
-import struct
 import re
 
+lock = threading.Lock()
 
 class ProcessEvaluator():
     def __init__(self, pid: int, minimumEncryptionWrite: int, shouldBackup: bool = False) -> None:
@@ -66,12 +65,32 @@ class ProcessEvaluator():
         self.__createdFileList.add(operation.filePath)
 
     def handleOperation(self, operation: ProcessOperation) -> None:
-        if (operation.operationType == OperationType.READ):
-            self.__handleReadOperation(operation)
-        if (operation.operationType == OperationType.WRITE):
-            self.__handleWriteOperation(operation)
-        if (operation.operationType == OperationType.CREATE):
-            self.__handleCreateOperation(operation)
+        lock.acquire()
+        try:
+            if (operation.operationType == OperationType.READ):
+                self.__handleReadOperation(operation)
+            if (operation.operationType == OperationType.WRITE):
+                self.__handleWriteOperation(operation)
+            if (operation.operationType == OperationType.CREATE):
+                self.__handleCreateOperation(operation)
+        finally:
+            lock.release()
+    
+    def __evaluateBaseCondition(self):
+        eWrites = self.__encryptionWrites + self.__encryptionModifies
+        eWriteRatio = eWrites / self.__reads
+        eEncryptionOutputRatio = self.__encryptionModifiesLen + \
+            self.__encryptionWritesLen / self.__WriteLen
+        return  eWrites > self.__minEWrite and (eWriteRatio > 1 or eEncryptionOutputRatio > 0.5)
+
+    def __initiateBackup(self):
+        if(len(self.__backup) == 0):
+            self.__backup["start"] = "true"
+            print("Backup started for " + self.pid)
+            print(f"Time taken  to find: {measeTimeUtils.MeasureTime.getTime()}")
+
+    def __deletion(self):
+        return True
 
     def evaluate(self):
         print(f"read: {self.__reads} \n\
@@ -79,13 +98,19 @@ class ProcessEvaluator():
                 emodifies = {self.__encryptionModifies} \n\
                 writes = {self.__writes} \n\
                 created = {self.__filesCreated}")
-        if (self.__reads <= 0 or self.__WriteLen <= 0):
+        if (self.__reads <= 0 or self.__WriteLen <= 0 or self.__encryptionWrites <= 0):
             return
-        eWrites = self.__encryptionWrites + self.__encryptionModifies
-        eWriteRatio = eWrites / self.__reads
-        eEncryptionOutputRatio = self.__encryptionModifiesLen + \
-            self.__encryptionWritesLen / self.__WriteLen
-        if (eWrites > self.__minEWrite
-                and (eWriteRatio > 0.5 or eEncryptionOutputRatio > 0.5)):
-            print("encryption detected with pid" + self.pid)
-            print(f"Time taken  to find: {measeTimeUtils.MeasureTime.getTime()}")
+        eModifiedRatio = self.__encryptionModifies / self.__encryptionWrites
+        if(eModifiedRatio > 0.2):
+            if (self.__evaluateBaseCondition()):
+                print("encryption detected with pid" + self.pid)
+                print(f"Time taken  to find: {measeTimeUtils.MeasureTime.getTime()}")
+                return True
+            self.__initiateBackup()
+        else:
+            if(self.__evaluateBaseCondition()):
+                self.__initiateBackup()
+                if(self.__deletion()):
+                    print("encryption detected with pid " + self.pid)
+                    print(f"Time taken  to find: {measeTimeUtils.MeasureTime.getTime()}")
+                    return True

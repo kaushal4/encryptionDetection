@@ -1,5 +1,4 @@
 import threading
-import time
 from .processTracer import ProcessTracer
 from .processEvaluator import ProcessEvaluator
 
@@ -10,9 +9,9 @@ class EvaluationController():
         self.__tracer: ProcessTracer = ProcessTracer(self.__pe)
 
     def run(self):
-        thread = threading.Thread(target=self.__tracer.run,group=None)
-        thread.start()  
-        while (thread.is_alive()):
+        tracerThread = threading.Thread(target=self.__tracer.run,group=None)
+        tracerThread.start()  
+        while (tracerThread.is_alive()):
             if(self.__pe.evaluate()):
                 break
         self.Terminate()    

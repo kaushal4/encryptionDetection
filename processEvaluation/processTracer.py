@@ -4,11 +4,14 @@ import re
 import subprocess
 import time
 from typing import Dict
+import threading
 
 from utils import measeTimeUtils
 
 from .popo import OperationType, ProcessOperation
 from .processEvaluator import ProcessEvaluator
+
+lock = threading.Lock()
 
 
 class ProcessSyscallType(enum.Enum):
@@ -23,6 +26,7 @@ class ProcessSyscall():
     def __init__(self, pst: ProcessSyscallType, data: str) -> None:
         self.pst: ProcessSyscallType = pst
         self.data: str = data
+        self.__lock = threading.Lock()
 
 
 class straceStartFail(Exception):
@@ -112,24 +116,28 @@ class ProcessTracer():
 
     def __parseOperation(self, straceOutput: str):
         measeTimeUtils.MeasureTime.start()
-        sysCall = self.__getOperation(straceOutput)
-        if (sysCall == ProcessSyscallType.OPEN):
-            self.__parseOpenOperation(straceOutput)
-        elif (sysCall == ProcessSyscallType.READ):
-            processOperation = self.__parseReadOperation(straceOutput)
-            if (processOperation is not None):
-                # self.__operations.put(processOperation)
-                self.pe.handleOperation(processOperation)
-        elif (sysCall == ProcessSyscallType.WRITE):
-            processOperation = self.__parseWriteOperation(straceOutput)
-            if (processOperation is not None):
-                # self.__operations.put(processOperation)
-                self.pe.handleOperation(processOperation)
-        elif (sysCall == ProcessSyscallType.CREATE):
-            processOperation = self.__parseCreateOperation(straceOutput)
-            if (processOperation is not None):
-                # self.__operations.put(processOperation)
-                self.pe.handleOperation(processOperation)
+        lock.acquire()
+        try:
+            sysCall = self.__getOperation(straceOutput)
+            if (sysCall == ProcessSyscallType.OPEN):
+                self.__parseOpenOperation(straceOutput)
+            elif (sysCall == ProcessSyscallType.READ):
+                processOperation = self.__parseReadOperation(straceOutput)
+                if (processOperation is not None):
+                    # self.__operations.put(processOperation)
+                    self.pe.handleOperation(processOperation)
+            elif (sysCall == ProcessSyscallType.WRITE):
+                processOperation = self.__parseWriteOperation(straceOutput)
+                if (processOperation is not None):
+                    # self.__operations.put(processOperation)
+                    self.pe.handleOperation(processOperation)
+            elif (sysCall == ProcessSyscallType.CREATE):
+                processOperation = self.__parseCreateOperation(straceOutput)
+                if (processOperation is not None):
+                    # self.__operations.put(processOperation)
+                    self.pe.handleOperation(processOperation)
+        finally:
+            lock.release()
 
     def __getOperation(self, straceOutput: str) -> ProcessSyscallType | None:
         operation = straceOutput.split('(')[0]
@@ -145,15 +153,21 @@ class ProcessTracer():
     def popQueue(self) -> ProcessOperation:
         return self.__operations.get()
 
+    def __processCommands(self,commands:str) -> None:
+        for command in commands:
+            if command != "":
+                self.__parseOperation(command)
+
     def run(self) -> None:
         self.__startTrace()
         if (self.__straceProcess is not None):
-            with open('./processEvaluation/output.txt', 'r') as f:
-                while self.__straceProcess.poll() is None:
-                    command = f.readline()
-                    if (len(command) != 0):
-                        self.__parseOperation(
-                            str(command))
-                    time.sleep(0.1)
+            lastPosition = 0
+            while self.__straceProcess.poll() is None:
+                with open('./processEvaluation/output.txt', 'r') as f:
+                    f.seek(lastPosition)
+                    commands = f.readlines()
+                    self.__processCommands(commands)
+                    lastPosition=f.tell()
+                time.sleep(0.0001)
             return
         raise straceStartFail()
